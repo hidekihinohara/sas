@@ -1,40 +1,40 @@
 %macro create_wdata(incsv,varlist);
+	options validvarname=any noMlogic mprint nosymbolgen;
+
 	/*ヘッダ行数を取得*/
-	data _null_;
-		infile "&incsv" encoding='ms932' delimiter = ',' MISSOVER DSD lrecl=32767 firstobs=1 obs=1;
-		input aaa $32767;
+	/*ヘッダ行を取得*/
+	filename flname "&incsv";
+	data WORK.header_trps(encoding=utf8 keep=name label);
+		infile "&incsv" encoding='ms932' delimiter = ',' MISSOVER DSD lrecl=32767 firstobs=1 obs=1 _infile_=inf1;
+		input;
 		count=count(_infile_,",")+1;
+		/*行数をマクロ変数に代入*/
 		call symputx("varcount",cats(count));
+		infile flname filevar=inf1 encoding='ms932' delimiter = ',' MISSOVER DSD lrecl=32767 firstobs=1 obs=1;
+		length name $32 label $256;
+		do i=1 to count;
+			input label $ @;
+			name="var" || cats(i);
+			output;
+		end;
 	run;
 
-	/*ヘッダ行を取得*/
-	data WORK.header_info(encoding=utf8);
-		infile "&incsv" encoding='ms932' delimiter = ',' MISSOVER DSD lrecl=32767 firstobs=1 obs=1;
-		informat var1-var&varcount $100.;
-		input var1-var&varcount $;
-	run;
-	/*transposeプロシジャでヘッダ行を取得*/
-	proc transpose data=work.header_info(obs=1) out=header_trps(rename=(_NAME_=NAME COL1=LABEL));
-		var var1-var&varcount;
-	run;
-	
 	/*データの長さ、タイプの判定*/
 	/*ヘッダ行を省き、変数名、長さをそろえてデータ取り込み*/
-	data WORK.data_info(encoding=utf8);
-		infile "&incsv" encoding='ms932' delimiter = ',' MISSOVER DSD lrecl=32767 firstobs=2 obs=max;
+	data _null_;
+		infile flname encoding='ms932' delimiter = ',' MISSOVER DSD lrecl=32767 firstobs=2 obs=max;
 		informat var1-var&varcount $100.;
 		input var1-var&varcount $;
+		file "/folders/myfolders/tmp.txt" encoding='utf8';
+		put _infile_;
 	run;
-	/*ヘッダ行を省いてデータ出力*/
-	proc export data=work.data_info outfile="/folders/myfolders/tmp.txt" replace;
-	run;
-	
+
 	/*再度データ出力*/
 	proc import datafile="/folders/myfolders/tmp.txt" dbms=dlm out=work.data_info(encoding=utf8) replace;
-		delimiter="09"x;
-		getnames=yes;
+		delimiter=",";
+		getnames=no;
 	run;
-	
+
 	/*ディスクリプタ情報を出力*/
 	proc datasets nodetails nolist nowarn;
 		contents memtype=data data=work.data_info out=work.data_info_des noprint ;
@@ -45,9 +45,6 @@
 		by varnum name label;
 	run;
 	
-	/*proc sort data=work.header_trps;
-		by varnum name label;
-	run;
 	/*ラベル名を含むディスクリプタデータセットの作成*/
 	data merge_header;
 		merge work.data_info_des work.header_trps(in=in2);
@@ -69,11 +66,11 @@
 		call symputx(cats("informl",_N_),cats(informl,"."));
 		call symputx("count",max(cats(varnum)));
 	run;
-	options validvarname=any noMlogic mprint nosymbolgen;
+	
 	/*ラベル名を含めてデータセットを作成*/
 	%macro loop_ds;
 		data test;
-		infile "/folders/myfolders/tmp.txt" encoding='UTF8' dlm='09'x MISSOVER DSD lrecl=32767 firstobs=2;
+		infile "/folders/myfolders/tmp.txt" encoding='utf8' dlm=',' MISSOVER DSD lrecl=32767 firstobs=1;
 			%do i=1 %to &count;
 				informat &&name&i &&informat&i..&&informl&i;
 			%end;
@@ -105,5 +102,5 @@
 	run;
 %mend;
 
-%create_wdata(/folders/myfolders/pre72h00_rct.txt,var10-var13)
+%create_wdata(/folders/myfolders/weatherreport/pre72h00_rct.csv,var10 var11 var13 var14)
 
