@@ -6,11 +6,10 @@
 	filename flname "&incsv";
 	data WORK.header_trps(encoding=utf8 keep=name label);
 		infile "&incsv" encoding='ms932' delimiter = ',' MISSOVER DSD lrecl=32767 firstobs=1 obs=1 _infile_=inf1;
-		input;
+		input @;
 		count=count(_infile_,",")+1;
 		/*行数をマクロ変数に代入*/
 		call symputx("varcount",cats(count));
-		infile flname filevar=inf1 encoding='ms932' delimiter = ',' MISSOVER DSD lrecl=32767 firstobs=1 obs=1;
 		length name $32 label $256;
 		do i=1 to count;
 			input label $ @;
