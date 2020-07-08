@@ -1,16 +1,17 @@
 %macro create_wdata(incsv,varlist);
-	options validvarname=any noMlogic mprint nosymbolgen;
-
+	options validvarname=any nomlogic nomprint nosymbolgen;
 	/*ヘッダ行数を取得*/
 	/*ヘッダ行を取得*/
 	filename flname "&incsv";
 	data WORK.header_trps(encoding=utf8 keep=name label);
-		infile "&incsv" encoding='ms932' delimiter = ',' MISSOVER DSD lrecl=32767 firstobs=1 obs=1 _infile_=inf1;
+		infile flname encoding='ms932' delimiter = ',' MISSOVER DSD lrecl=32767 firstobs=1 obs=1;
+		/*後置inputでinput待ち*/
 		input @;
 		count=count(_infile_,",")+1;
 		/*行数をマクロ変数に代入*/
 		call symputx("varcount",cats(count));
 		length name $32 label $256;
+		/*行を列に展開*/
 		do i=1 to count;
 			input label $ @;
 			name="var" || cats(i);
@@ -40,14 +41,18 @@
 	run;
 	quit;
 	
-	proc sort data=work.data_info_des;
-		by varnum name label;
-	run;
-	
 	/*ラベル名を含むディスクリプタデータセットの作成*/
 	data merge_header;
-		merge work.data_info_des work.header_trps(in=in2);
-	run; 
+		if _N_=0 then set work.header_trps;
+		if _N_=1 then do;
+			declare hash tmp(dataset:"work.header_trps");
+			tmp.definekey("NAME");
+			tmp.definedata("LABEL");
+			tmp.definedone();
+		end;
+		set work.data_info_des;
+		rc=tmp.find();
+	run;
 	
 	/*informat,format,labelステートメントを生成する*/
 	data _NULL_;
@@ -101,5 +106,4 @@
 	run;
 %mend;
 
-%create_wdata(/folders/myfolders/weatherreport/pre72h00_rct.csv,var10 var11 var13 var14)
-
+%create_wdata(/folders/myfolders/weatherreport/pre72h00_rct.csv,var10-var13)
